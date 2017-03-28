@@ -2,4 +2,4 @@ cmake_minimum_required(VERSION 3.5)
 
 add_subdirectory ("test")
 
-project (any_with_traits)
+project (toolbox)
