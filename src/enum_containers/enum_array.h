@@ -1,3 +1,4 @@
+#pragma once
 #include <array>
 
 // enum indexed std::array

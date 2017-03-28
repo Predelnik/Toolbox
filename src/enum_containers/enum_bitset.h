@@ -1,3 +1,4 @@
+#pragma once
 #include <bitset>
 
 // enum indexed std::bitset

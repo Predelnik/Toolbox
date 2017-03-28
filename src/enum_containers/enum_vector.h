@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 
 // essenitaly the same as enum_array (not resizable like std:vector) but created on heap and allocated in the constructor (ValueT, EnumT could be forward declared)
