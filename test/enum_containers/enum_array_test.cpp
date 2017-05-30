@@ -54,7 +54,7 @@ TEST_CASE("enum_array") {
   REQUIRE(std::all_of(other.cbegin(), other.cend(),
                       [](const int &val) { return val == 333; }));
   {
-    using ebc::get;
+    using std::get;
     REQUIRE(0 == get<AnimalType::crow>(ea));
     REQUIRE(666 == get<AnimalType::rabbit>(cr));
     REQUIRE(4 == get<AnimalType::fox>([&] { return ea; }()));

@@ -10,7 +10,7 @@ struct A;
 }
 
 struct C {
-  ebc::enum_vector<AnimalType, A>
+  enum_vector<AnimalType, A>
       ea; // checking instaniation without full definition
 };
 
@@ -32,7 +32,7 @@ struct A {};
 
 TEST_CASE("enum_vector") {
   C x;
-  ebc::enum_vector<AnimalType, int> ea;
+  enum_vector<AnimalType, int> ea;
   ea.fill(0);
   REQUIRE(std::all_of(ea.begin(), ea.end(),
                       [](const int &val) { return val == 0; }));
@@ -49,7 +49,7 @@ TEST_CASE("enum_vector") {
   REQUIRE(ea[AnimalType::rabbit] == 666);
   REQUIRE(*std::min_element(cr.crbegin(), cr.crend()) == 0);
   REQUIRE_FALSE(cr.empty());
-  ebc::enum_vector<empty_enum, double> e;
+  enum_vector<empty_enum, double> e;
   REQUIRE(e.empty());
   REQUIRE(3 == ea.size());
   auto other = ea;
