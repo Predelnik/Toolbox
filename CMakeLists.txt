@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-add_subdirectory ("test")
+add_subdirectory (src)
+add_subdirectory (test)
 
 project (toolbox)
