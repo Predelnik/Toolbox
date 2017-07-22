@@ -4,6 +4,12 @@
 #include <cassert>
 #include <array>
 
+#ifndef _MSC_VER
+#define TYPENAME_IF_NOT_MSVC typename // due to bug in msvc with parsing variadic template templates
+#else
+#define TYPENAME_IF_NOT_MSVC
+#endif // _MSC_VER
+
 namespace btree
 {
   enum class color_t : char
@@ -23,15 +29,86 @@ namespace btree
     return d == left ? right : left;
   }
 
-  template <typename KeyType>
+  template <typename KeyType, template <typename, typename> class... Plugins>
   struct rb_tree_container;
 
+  template <typename KeyType, typename NodeType, template <typename, typename> class... Plugins>
+  struct btree_container;
+
   template <typename KeyType, typename NodeType>
+  class indexation_plugin
+    {
+    public:
+      class node_t
+      {
+      public:
+          std::size_t node_count () const { return m_node_count; }
+
+      private:
+        std::size_t m_node_count = 1;
+        
+      public:
+        void on_new_child ()
+        {
+          auto current = static_cast<NodeType *> (this)->parent();
+          while (current) 
+          {
+            current->m_node_count += m_node_count;
+            current = current->parent ();
+          }
+        }
+
+        void before_takeout ()
+        {
+          auto current = static_cast<NodeType *> (this)->parent();
+          while (current) 
+          {
+            current->m_node_count -= m_node_count;
+            current = current->parent ();
+          }
+        }
+      };
+
+      template <typename TreeType>
+      class tree_t
+      {
+      public:
+        template <typename ArgType>
+        std::size_t index (const ArgType &key)
+        {
+          auto current = static_cast<TreeType*> (this)->root();
+          std::size_t index_so_far = 0;
+          while (current)
+            {
+              if (key < current->key ())
+                current = current->child (left);
+              else if (current->key () < key)
+                {
+                  index_so_far += (current->child (left) ? current->child (left)->node_count () :0) + 1;
+                  current = current->child (right);
+                }
+              else
+                {
+                  index_so_far += (current->child (left) ? current->child (left)->node_count () :0);
+                  break;
+                }
+            }
+          if (current)
+            return index_so_far;
+
+          return static_cast<std::size_t> (-1);
+        }
+      };
+    };
+
+  template <typename KeyType, typename NodeType, template <typename, typename> class... Plugins>
   struct btree_container
   {
     class tree_t;
+    class node_t;
 
-    class node_t
+  public:
+    class node_t : public Plugins<KeyType, NodeType>::node_t...
     {
     public:
       template <typename ArgType>
@@ -102,6 +179,7 @@ namespace btree
 
       std::unique_ptr<NodeType> take_out()
       {
+        std::initializer_list<int> {(static_cast<TYPENAME_IF_NOT_MSVC Plugins<KeyType, NodeType>::node_t*> (this)->before_takeout (), 0)...};
         auto& n = location();
         n->m_parent = nullptr;
         return std::move(n);
@@ -112,6 +190,7 @@ namespace btree
         node->m_parent = static_cast<NodeType *>(this);
         assert (m_children[dir] == nullptr);
         m_children[dir] = std::move(node);
+        std::initializer_list<int> {(static_cast<TYPENAME_IF_NOT_MSVC Plugins<KeyType, NodeType>::node_t*> (m_children[dir].get ())->on_new_child (),0)...};
         return m_children[dir].get();
       }
 
@@ -128,7 +207,7 @@ namespace btree
       friend class tree_t;
     };
 
-    class tree_t
+    class tree_t : public Plugins<KeyType, NodeType>::template tree_t<tree_t>...
     {
     public:
       void clear ()
@@ -253,14 +332,14 @@ namespace btree
     };
   };
 
-  template <typename KeyType>
+  template <typename KeyType, template<typename, typename> class... Plugins>
   struct rb_tree_container
   {
     class tree_t;
 
-    struct node_t : btree_container<KeyType, node_t>::node_t
+    struct node_t : btree_container<KeyType, node_t, Plugins...>::node_t
     {
-      using parent_t = typename btree_container<KeyType, node_t>::node_t;
+      using parent_t = typename btree_container<KeyType, node_t, Plugins...>::node_t;
       using parent_t::parent_t;
     public:
       auto color() const { return m_color; }
@@ -280,18 +359,18 @@ namespace btree
       friend class tree_t;
     };
 
-    class tree_t
+    class tree_t : public btree_container<KeyType, node_t, Plugins...>::tree_t
     {
       // red black tree with indexation by log n
       using self = tree_t;
-      using base = typename btree_container<KeyType, node_t>::tree_t;
+      using base = typename btree_container<KeyType, node_t, Plugins...>::tree_t;
     public:
       using node_t = node_t;
     public:
       template <typename ArgType>
       void insert(ArgType&& key)
       {
-        auto current = m_tree.preinsert(std::forward<ArgType>(key));
+        auto current = preinsert(std::forward<ArgType>(key));
         while (true)
         {
           auto parent = current->parent();
@@ -317,11 +396,11 @@ namespace btree
 
           if (current->direction_from_parent() != parent->direction_from_parent())
           {
-            m_tree.rotate(parent, other_direction(current->direction_from_parent()));
+            rotate(parent, other_direction(current->direction_from_parent()));
             std::swap(current, parent);
           }
 
-          m_tree.rotate(grand_parent, other_direction(current->direction_from_parent()));
+          rotate(grand_parent, other_direction(current->direction_from_parent()));
           std::swap(grand_parent->m_color, parent->m_color);
           break;
         }
@@ -330,7 +409,7 @@ namespace btree
       template <typename ArgType>
       std::size_t erase(const ArgType& key)
       {
-        auto m = m_tree.preerase(key);
+        auto m = preerase(key);
         if (!m)
           return 0;
 
@@ -356,7 +435,7 @@ namespace btree
           if (s->color() == color_t::red)
           {
             std::swap(p->m_color, s->m_color);
-            m_tree.rotate(p, n_direction);
+            rotate(p, n_direction);
             s = p->child (other_direction(n_direction)); // update sibling
           }
 
@@ -379,27 +458,23 @@ namespace btree
           }
           if (s->child_color (n_direction) == color_t::red)
           {
-            m_tree.rotate(s, other_direction(n_direction));
+            rotate(s, other_direction(n_direction));
             std::swap(s->m_color, s->parent ()->m_color);
             s = s->parent ();
           }
 
-          m_tree.rotate(p, n_direction);
+          rotate(p, n_direction);
           std::swap(p->m_color, s->m_color);
           s->child(other_direction(n_direction))->paint(color_t::black);
           break;
         }
         return 1;
       }
-
-      void clear () { m_tree.clear (); }
-
-      const node_t* root() const { return m_tree.root(); }
-    private:
-      typename btree_container<KeyType, node_t>::tree_t m_tree;
     };
   };
 
   template <typename KeyType>
   using rb_tree = typename rb_tree_container<KeyType>::tree_t;
+  template <typename KeyType>
+  using indexed_rb_tree = typename rb_tree_container<KeyType, indexation_plugin>::tree_t;
 } // namespace btrees

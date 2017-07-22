@@ -72,3 +72,25 @@ TEST_CASE("rb_tree") {
   .walk(right).key (16).color (color_t::black)
   .walk(left).key (15).color (color_t::red);
 }
+
+TEST_CASE("indexed_rb_tree")
+{
+  using namespace btree;
+  indexed_rb_tree<int> tree;
+  tree.insert(3);
+  REQUIRE (tree.index (3) == 0);
+  tree.insert(7);
+  REQUIRE (tree.index (7) == 1);
+  tree.insert(5);
+  REQUIRE (tree.index (5) == 1);
+  tree.insert(6);
+  REQUIRE (tree.index (6) == 2);
+  REQUIRE (tree.index (3) == 0);
+  tree.erase (5);
+  REQUIRE (tree.index (6) == 1);
+  REQUIRE (tree.index (7) == 2);
+  tree.insert (100);
+  tree.insert (150);
+  tree.insert (200);
+  REQUIRE (tree.index (150) == 4);
+}
