@@ -152,16 +152,6 @@ namespace btree
         return nullptr;
       }
 
-      void replace_with_child()
-      {
-        auto cnt = child_count();
-        auto direction = direction_from_parent();
-        take_out();
-        if (cnt == 0)
-          return;
-        parent()->append_child(direction, single_child()->take_out());
-      }
-
       bool is_root()
       {
         return m_parent == nullptr;
@@ -215,16 +205,37 @@ namespace btree
         m_root.reset ();
       }
 
+      std::unique_ptr<NodeType> take_out(NodeType *node)
+      {
+        if (node->parent ())
+          return node->take_out ();
+        else
+          return std::move (m_root);
+      }
+
+      void replace_with_child(NodeType *node)
+      {
+        auto cnt = node->child_count();
+        auto direction = node->direction_from_parent();
+        auto parent = node->parent ();
+        auto taken_out = take_out (node);
+        if (cnt == 0)
+          return;
+        if (parent)
+          parent->append_child(direction, take_out (node->single_child()));
+        else
+          m_root = node->single_child()->take_out();
+      }
       void rotate(NodeType *node, direction_t dir)
       {
         auto prev_parent = node->parent();
         direction_t prev_direction;
         if (prev_parent)
            prev_direction = node->direction_from_parent();
-        auto hanging_node = prev_parent ? node->take_out() : std::move (m_root);
-        auto heritor = node->child(other_direction(dir))->take_out();
+        auto hanging_node = take_out (node);
+        auto heritor = take_out (node->child(other_direction(dir)));
         if (heritor->child(dir))
-          node->append_child(other_direction(dir), heritor->child(dir)->take_out());
+          node->append_child(other_direction(dir), take_out (heritor->child(dir)));
 
         heritor->append_child(dir, std::move(hanging_node));
         if (prev_parent)
@@ -240,7 +251,7 @@ namespace btree
         if (!current)
           return 0;
 
-        current->replace_with_child();
+        replace_with_child(current);
         return 1;
       }
 
@@ -414,12 +425,12 @@ namespace btree
           return 0;
 
         if (m->color() == color_t::red)
-          return (m->replace_with_child() , 1);
+          return (replace_with_child(m) , 1);
         auto c = m->single_child();
         auto p = m->parent();
         auto s = m->sibling();
         auto n_direction = m->direction_from_parent();
-        m->replace_with_child();
+        replace_with_child(m);
         if (c && c->color() == color_t::red)
         {
           c->paint(color_t::black);

@@ -93,4 +93,15 @@ TEST_CASE("indexed_rb_tree")
   tree.insert (150);
   tree.insert (200);
   REQUIRE (tree.index (150) == 4);
+
+  {
+    indexed_rb_tree<int> t;
+    for (auto i : {0, 1, 2, 3})
+      t.insert (i);
+    t.erase (2);
+     walk (t).color(color_t::black).key (1).color (color_t::black)
+    .walk(left).key (0).color (color_t::black).to_root ()
+    .walk(right).key (3).color (color_t::black);
+  }
+}
 }
