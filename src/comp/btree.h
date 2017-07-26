@@ -3,6 +3,7 @@
 #include <map>
 #include <cassert>
 #include <array>
+#include <iterator>
 
 #ifndef _MSC_VER
 #define TYPENAME_IF_NOT_MSVC typename // due to bug in msvc with parsing variadic template templates
@@ -20,8 +21,9 @@ namespace btree
 
   enum direction_t
   {
-    left,
-    right,
+    none  = -1,
+    left  = 0,
+    right = 1,
   };
 
   inline direction_t other_direction(direction_t d)
@@ -48,6 +50,7 @@ namespace btree
         std::size_t m_node_count = 1;
         
       public:
+
         void on_new_child ()
         {
           auto current = static_cast<NodeType *> (this)->parent();
@@ -130,10 +133,10 @@ namespace btree
 
       NodeType* sibling()
       {
-        return m_parent->child(other_direction(direction_from_parent()));
+        return m_parent ? m_parent->child(other_direction(direction_from_parent())) : nullptr;
       }
 
-      int child_count()
+      int child_count() const
       {
         int cnt = 0;
         for (auto direction : {left, right})
@@ -159,7 +162,9 @@ namespace btree
 
       direction_t direction_from_parent() const
       {
-        assert (m_parent);
+        if (!m_parent)
+          return none;
+
         for (auto b : {left, right})
           if (m_parent->m_children[b].get() == this)
             return b;
@@ -197,6 +202,7 @@ namespace btree
       friend class tree_t;
     };
 
+
     class tree_t : public Plugins<KeyType, NodeType>::template tree_t<tree_t>...
     {
     public:
@@ -226,6 +232,7 @@ namespace btree
         else
           m_root = node->single_child()->take_out();
       }
+
       void rotate(NodeType *node, direction_t dir)
       {
         auto prev_parent = node->parent();
@@ -355,7 +362,7 @@ namespace btree
     public:
       auto color() const { return m_color; }
 
-      auto child_color(direction_t direction)
+      auto child_color(direction_t direction) const
       {
         if (!this->child(direction))
           return color_t::black;
@@ -381,7 +388,7 @@ namespace btree
       template <typename ArgType>
       void insert(ArgType&& key)
       {
-        auto current = preinsert(std::forward<ArgType>(key));
+        auto current = this->preinsert(std::forward<ArgType>(key));
         while (true)
         {
           auto parent = current->parent();
@@ -407,11 +414,11 @@ namespace btree
 
           if (current->direction_from_parent() != parent->direction_from_parent())
           {
-            rotate(parent, other_direction(current->direction_from_parent()));
+            this->rotate(parent, other_direction(current->direction_from_parent()));
             std::swap(current, parent);
           }
 
-          rotate(grand_parent, other_direction(current->direction_from_parent()));
+          this->rotate(grand_parent, other_direction(current->direction_from_parent()));
           std::swap(grand_parent->m_color, parent->m_color);
           break;
         }
@@ -420,7 +427,7 @@ namespace btree
       template <typename ArgType>
       std::size_t erase(const ArgType& key)
       {
-        auto m = preerase(key);
+        auto m = this->preerase(key);
         if (!m)
           return 0;
 
@@ -437,16 +444,16 @@ namespace btree
           return 1;
         }
 
+        auto n = c;
         while (true)
         {
-          auto n = c;
           if (p == nullptr)
             return 1;
 
           if (s->color() == color_t::red)
           {
             std::swap(p->m_color, s->m_color);
-            rotate(p, n_direction);
+            this->rotate(p, n_direction);
             s = p->child (other_direction(n_direction)); // update sibling
           }
 
@@ -457,10 +464,9 @@ namespace btree
             {
               s->paint(color_t::red);
               n = p;
-              c = n->single_child();
               p = n->parent();
               s = n->sibling();
-              n_direction = n->direction_from_parent();
+              n_direction = p ? n->direction_from_parent() : none;
               continue;
             }
 
@@ -469,12 +475,12 @@ namespace btree
           }
           if (s->child_color (n_direction) == color_t::red)
           {
-            rotate(s, other_direction(n_direction));
+            this->rotate(s, other_direction(n_direction));
             std::swap(s->m_color, s->parent ()->m_color);
             s = s->parent ();
           }
 
-          rotate(p, n_direction);
+          this->rotate(p, n_direction);
           std::swap(p->m_color, s->m_color);
           s->child(other_direction(n_direction))->paint(color_t::black);
           break;

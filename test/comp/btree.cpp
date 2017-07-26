@@ -1,5 +1,6 @@
 #include "comp/btree.h"
 #include "catch.hpp"
+#include <random>
 
 template <typename Tree>
 struct tree_walker
@@ -45,6 +46,48 @@ private:
 };
 
 template <typename Tree>
+void check_rb_tree (const Tree &tree)
+{
+  using namespace btree;
+  REQUIRE (tree.root ()->color () == btree::color_t::black);
+  auto cur_node = tree.root (), next_node = cur_node;
+  int black_cnt = 0;
+  auto calc = [&](auto node, int inc){ if (node->color () == color_t::black) black_cnt += inc; };
+  do {
+      calc (cur_node = next_node, 1);  
+      next_node = cur_node->child (btree::left);
+    } while (next_node);
+   int etalon_black_cnt = black_cnt;
+   while (cur_node)
+     {
+       if (cur_node->color () == color_t::red)
+         {
+          REQUIRE (cur_node->child_color (left) == color_t::black);
+          REQUIRE (cur_node->child_color (right) == color_t::black);
+         }
+
+        if (cur_node->child_count () < 2)
+          REQUIRE(black_cnt == etalon_black_cnt);    
+        
+        if (auto c = cur_node->child (right))
+          {
+            calc (cur_node = c, 1);
+            while ((c = cur_node->child (left)))
+              calc (cur_node = c, 1);
+            continue;
+          }
+
+        while (cur_node->parent () && cur_node->direction_from_parent () == right)
+          {
+            calc (cur_node, -1);
+            cur_node = cur_node->parent ();
+          }
+        calc (cur_node, -1);
+        cur_node = cur_node->parent ();
+     }
+}
+
+template <typename Tree>
 tree_walker<Tree> walk (const Tree &tree) { return {tree}; }
 
 TEST_CASE("rb_tree") {
@@ -71,6 +114,12 @@ TEST_CASE("rb_tree") {
   .to_root()
   .walk(right).key (16).color (color_t::black)
   .walk(left).key (15).color (color_t::red);
+
+  {
+    rb_tree<int> tree;
+    tree.insert (123);
+    tree.erase (123);
+  }
 }
 
 TEST_CASE("indexed_rb_tree")
@@ -104,4 +153,31 @@ TEST_CASE("indexed_rb_tree")
     .walk(right).key (3).color (color_t::black);
   }
 }
+
+TEST_CASE("random_rb_tree_test")
+{
+  using namespace btree;
+  rb_tree<int> tree;
+  std::random_device rd;
+  std::uniform_int_distribution<int> insert_uid (0, 10000);
+  int insert_count = 100;
+  int check_frequency = 10;
+  std::vector<int> tree_val;
+  for (int i = 0; i < insert_count; ++i)
+    {
+      tree_val.push_back(insert_uid (rd));
+      tree.insert (tree_val.back ());
+    if (i % check_frequency == 0)
+      check_rb_tree(tree);
+    }
+  int erase_count = 50;
+  std::uniform_int_distribution<int> erase_uid (0, static_cast<int> (tree_val.size () - 1));
+  for (int i = 0; i < erase_count; ++i)
+    {
+      tree.erase (tree_val[erase_uid (rd)]);
+      if (i % check_frequency == 0)
+        check_rb_tree(tree);
+    }
+}
+
 }
