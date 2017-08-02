@@ -180,4 +180,17 @@ TEST_CASE("random_rb_tree_test")
     }
 }
 
+TEST_CASE("iterator")
+{
+  using namespace btree;
+  rb_tree<int> tree;
+  tree.insert (7);
+  tree.insert (5);
+  tree.insert (17);
+  tree.insert (13);
+  tree.insert (21);
+  std::vector<int> v{5, 7, 13, 17, 21};
+  REQUIRE (std::equal (tree.begin(), tree.end (), v.begin ()));
+  std::reverse (v.begin (), v.end ());
+  REQUIRE (std::equal (std::make_reverse_iterator(tree.end()), std::make_reverse_iterator(tree.begin ()), v.begin ()));
 }
