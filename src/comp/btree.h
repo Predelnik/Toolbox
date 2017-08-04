@@ -110,11 +110,17 @@ namespace btree
     class tree_t;
     class node_t;
     class iterator_t;
+    class base_node_t;
+    using node_storage_t = std::unique_ptr<base_node_t, void (*)(base_node_t *)>;
+    static void delete_node(base_node_t *node) { delete static_cast<NodeType *> (node); }
+    template <typename ArgType>
+    static node_storage_t make_node (ArgType &&key) { return node_storage_t (new NodeType (std::forward<ArgType> (key)), &delete_node); } 
 
   public:
     class base_node_t
     {
     protected:
+      base_node_t (bool is_sentinel_arg) : is_sentinel (is_sentinel_arg) {}
       bool is_sentinel : 1;
       friend class node_t;
       friend class iterator_t;
@@ -123,7 +129,7 @@ namespace btree
     class sentinel_t : public base_node_t
     {
     public:
-      sentinel_t(tree_t* tree_ptr) : m_tree_ptr(tree_ptr) { this->is_sentinel = 1; }
+      sentinel_t(tree_t* tree_ptr) : base_node_t (true), m_tree_ptr(tree_ptr) {}
     private:
       tree_t* m_tree_ptr;
       friend class iterator_t;
@@ -133,9 +139,10 @@ namespace btree
     {
     public:
       template <typename ArgType>
-      explicit node_t(ArgType&& key) : m_key(std::forward<ArgType>(key))
+      explicit node_t(ArgType&& key) : base_node_t (false),
+        m_children {node_storage_t {nullptr, &delete_node}, node_storage_t {nullptr, &delete_node}},
+        m_key(std::forward<ArgType>(key))
       {
-        this->is_sentinel = false;
       }
       ~node_t (){}
 
@@ -221,19 +228,19 @@ namespace btree
         return left;
       }
 
-      std::unique_ptr<NodeType> take_out()
+      node_storage_t take_out()
       {
         if (this->is_sentinel)
-          return nullptr;
+          return {nullptr, &delete_node};
         std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<KeyType, NodeType>::node_t*>(this)->before_takeout() , 0)...};
         auto parent = this->m_parent;
         auto direction = direction_from_parent();
         this->m_parent = nullptr;
         auto raw_ptr = parent->m_children[direction].release ();
-        return std::unique_ptr<NodeType>(static_cast<NodeType *>(raw_ptr));
+        return node_storage_t (static_cast<NodeType *>(raw_ptr), &delete_node);
       }
 
-      NodeType* append_child(direction_t dir, std::unique_ptr<base_node_t> node)
+      NodeType* append_child(direction_t dir, node_storage_t node)
       {
         assert (m_children[dir] == nullptr || m_children[dir]->is_sentinel);
         m_children[dir] = std::move(node);
@@ -247,7 +254,7 @@ namespace btree
       }
 
     private:
-      std::array<std::unique_ptr<base_node_t>, 2> m_children;
+      std::array<node_storage_t, 2> m_children;
       NodeType* m_parent = nullptr;
       KeyType m_key;
 
@@ -331,8 +338,14 @@ namespace btree
 
     class tree_t : public Plugins<KeyType, NodeType>::template tree_t<tree_t>...
     {
+      using self = tree_t;
     public:
       using iterator = iterator_t;
+
+      tree_t () : m_sentinel (this), m_size (0), m_root (nullptr, &delete_node)
+      {
+        
+      }
 
       iterator_t begin()
       {
@@ -341,7 +354,7 @@ namespace btree
 
       iterator_t end()
       {
-        return {m_root ? furthest_node(right)->m_children[right].get () : nullptr};
+        return {&m_sentinel};
       }
 
 
@@ -352,7 +365,7 @@ namespace btree
         m_size = 0;
       }
 
-      std::unique_ptr<NodeType> take_out(NodeType* node)
+      node_storage_t take_out(NodeType* node)
       {
         if (node->parent())
           return node->take_out();
@@ -366,12 +379,36 @@ namespace btree
         auto direction = node->direction_from_parent();
         auto parent = node->parent();
         auto taken_out = take_out(node);
+        auto update_furthest_nodes =
+        [&]()
+        {
+          for (auto furthest_node_dir : {left, right})
+            if (node == m_furthest_node[furthest_node_dir])
+              {
+                if (parent)
+                  {
+                    if (auto child = parent->child (furthest_node_dir))
+                      m_furthest_node[furthest_node_dir] = child;
+                    else
+                      m_furthest_node[furthest_node_dir] = parent;
+                  }
+                else
+                  m_furthest_node[furthest_node_dir] = static_cast<NodeType *> (m_root.get ());
+                if (furthest_node_dir == right && m_furthest_node[right])
+                  m_furthest_node[right]->append_child (right, make_sentinel());
+              }
+        };
+
         if (cnt == 0)
+        {
+          update_furthest_nodes ();
           return;
+        }
         if (parent)
           parent->append_child(direction, take_out(node->single_child()));
         else
           m_root = node->single_child()->take_out();
+        update_furthest_nodes ();
       }
 
       void rotate(NodeType* node, direction_t dir)
@@ -382,10 +419,11 @@ namespace btree
           prev_direction = node->direction_from_parent();
         auto hanging_node = take_out(node);
         auto heritor = take_out(node->child(other_direction(dir)));
-        if (heritor->child(dir))
-          node->append_child(other_direction(dir), take_out(heritor->child(dir)));
+        auto heritor_ptr = static_cast<NodeType *> (heritor.get ());
+        if (heritor_ptr->child(dir))
+          node->append_child(other_direction(dir), take_out(heritor_ptr->child(dir)));
 
-        heritor->append_child(dir, std::move(hanging_node));
+        heritor_ptr->append_child(dir, std::move(hanging_node));
         if (prev_parent)
           prev_parent->append_child(prev_direction, std::move(heritor));
         else
@@ -405,7 +443,7 @@ namespace btree
 
       std::size_t size() const { return m_size; }
 
-      const NodeType* root() const { return m_root.get(); }
+      const NodeType* root() const { return static_cast<NodeType *> (m_root.get()); }
 
     protected:
       NodeType* furthest_node(direction_t direction)
@@ -418,15 +456,15 @@ namespace btree
       {
         auto create_node = [](auto&& key)
         {
-          auto node = std::make_unique<NodeType>(std::forward<ArgType>(key));
+          auto node = make_node (std::forward<ArgType>(key));
           return node;
         };
 
-        auto current = m_root.get();
+        auto current = static_cast<NodeType *> (m_root.get());
         if (!current)
         {
           m_root = create_node(std::forward<ArgType>(key));
-          current = m_root.get();
+          current = static_cast<NodeType *> (m_root.get());
         }
         else
         {
@@ -462,7 +500,7 @@ namespace btree
           {
             m_furthest_node[direction] = current;
             if (direction == right)
-              m_furthest_node[direction]->append_child(right, std::make_unique<sentinel_t>(this));
+              m_furthest_node[direction]->append_child(right, make_sentinel ());
           }
         ++m_size;
         return current;
@@ -474,7 +512,7 @@ namespace btree
         if (!m_root)
           return nullptr;
 
-        auto current = m_root.get();
+        auto current = static_cast<NodeType *> (m_root.get());
         while (current)
         {
           if (key < current->key())
@@ -488,11 +526,6 @@ namespace btree
         if (!current)
           return nullptr;
 
-        for (auto direction : {left, right})
-          if (current == m_furthest_node[direction])
-          {
-            m_furthest_node[direction] = current->parent();
-          }
         --m_size;
 
         auto cnt = current->child_count();
@@ -507,16 +540,17 @@ namespace btree
         return child;
       }
 
-      void posterase ()
+    private:
+      node_storage_t make_sentinel ()
       {
-        if (m_furthest_node[right] && m_furthest_node[right]->m_children[right] == nullptr)
-          m_furthest_node[right]->append_child(right, std::make_unique<sentinel_t>(this));
+        return node_storage_t (&this->m_sentinel, [](base_node_t*){});
       }
 
     private:
+      sentinel_t m_sentinel;
       size_t m_size;
       std::array<NodeType *, 2> m_furthest_node = {nullptr, nullptr};
-      std::unique_ptr<NodeType> m_root;
+      node_storage_t m_root;
 
       friend struct rb_tree_container<KeyType>;
       friend class iterator_t;
@@ -558,6 +592,10 @@ namespace btree
     public:
       using node_t = node_t;
     public:
+
+      tree_t () : base () {}
+      ~tree_t () {}
+
       template <typename ArgType>
       void insert(ArgType&& key)
       {
@@ -607,7 +645,6 @@ namespace btree
         if (m->color() == color_t::red)
           {
             replace_with_child(m);
-            this->posterase ();
             return 1;
           }
         auto c = m->single_child();
@@ -615,7 +652,6 @@ namespace btree
         auto s = m->sibling();
         auto n_direction = m->direction_from_parent();
         replace_with_child(m);
-        this->posterase ();
         if (c && c->color() == color_t::red)
         {
           c->paint(color_t::black);
