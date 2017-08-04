@@ -31,13 +31,13 @@ namespace btree
     return d == left ? right : left;
   }
 
-  template <typename KeyType, template <typename, typename> class... Plugins>
+  template <typename KeyType, template <typename> class... Plugins>
   struct rb_tree_container;
 
-  template <typename KeyType, typename NodeType, template <typename, typename> class... Plugins>
+  template <typename KeyType, typename NodeType, template <typename> class... Plugins>
   struct btree_container;
 
-  template <typename KeyType, typename NodeType>
+  template <typename NodeType>
   class indexation_plugin
   {
   public:
@@ -104,7 +104,7 @@ namespace btree
     };
   };
 
-  template <typename KeyType, typename NodeType, template <typename, typename> class... Plugins>
+  template <typename KeyType, typename NodeType, template <typename> class... Plugins>
   struct btree_container
   {
     class tree_t;
@@ -135,7 +135,7 @@ namespace btree
       friend class iterator_t;
     };
 
-    class node_t : public base_node_t, public Plugins<KeyType, NodeType>::node_t...
+    class node_t : public base_node_t, public Plugins<NodeType>::node_t...
     {
     public:
       template <typename ArgType>
@@ -232,7 +232,7 @@ namespace btree
       {
         if (this->is_sentinel)
           return {nullptr, &delete_node};
-        std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<KeyType, NodeType>::node_t*>(this)->before_takeout() , 0)...};
+        std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<NodeType>::node_t*>(this)->before_takeout() , 0)...};
         auto parent = this->m_parent;
         auto direction = direction_from_parent();
         this->m_parent = nullptr;
@@ -247,7 +247,7 @@ namespace btree
         if (!m_children[dir]->is_sentinel)
         {
           static_cast<NodeType *>(m_children[dir].get())->m_parent = static_cast<NodeType *>(this);
-          std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<KeyType, NodeType>::node_t*>(this->child(dir))->on_new_child() , 0)...};
+          std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<NodeType>::node_t*>(this->child(dir))->on_new_child() , 0)...};
         }
 
         return this->child(dir);
@@ -292,15 +292,11 @@ namespace btree
 
       self& operator--()
       {
-        switch (m_node_ptr->is_sentinel)
-        {
-        case false:
+        if (!m_node_ptr->is_sentinel)
           m_node_ptr = get_node()->next_node(left);
-          break;
-        case true:
+        else
           m_node_ptr = get_tree()->furthest_node(right);
-          break;
-        }
+
         return *this;
       }
 
@@ -336,7 +332,7 @@ namespace btree
       base_node_t* m_node_ptr;
     };
 
-    class tree_t : public Plugins<KeyType, NodeType>::template tree_t<tree_t>...
+    class tree_t : public Plugins<NodeType>::template tree_t<tree_t>...
     {
       using self = tree_t;
     public:
@@ -557,7 +553,7 @@ namespace btree
     };
   };
 
-  template <typename KeyType, template<typename, typename> class... Plugins>
+  template <typename KeyType, template<typename> class... Plugins>
   struct rb_tree_container
   {
     class tree_t;

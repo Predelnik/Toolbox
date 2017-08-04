@@ -101,11 +101,16 @@ TEST_CASE("rb_tree") {
   .walk(left).key (11).color (color_t::red)
   .up ().walk(right).key (16).color (color_t::red);
   t.clear ();
+  REQUIRE (t.size () == 0);
   for (auto i : {5, 11, 3, 16, 12, 7, 66, 15, 10})
     t.insert (i);
 
+  REQUIRE (t.size () == 9);
+
   for (auto i : {12, 3, 66})
     t.erase (i);
+
+  REQUIRE (t.size () == 6);
 
   walk (t).color(color_t::black).key (11).color (color_t::black)
     .walk(left).key (7).color (color_t::red)
