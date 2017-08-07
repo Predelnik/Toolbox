@@ -13,7 +13,7 @@ class longnum
     plus,
     minus,
   };
-  sign_t negate (sign_t sign)
+  static sign_t negate (sign_t sign)
   {
     switch (sign)
       {
@@ -43,12 +43,78 @@ public:
     }
   }
 
-  bool operator== (const self &other)
+  bool operator== (const self &other) const
   {
     return (m_digits == other.m_digits);
   }
 
-  self operator* (const self &other)
+  bool operator< (const self &other) const
+  {
+    if (digit_count () < other.digit_count())
+      return true;
+
+    if (digit_count () > other.digit_count())
+      return false;
+
+    for (auto i = static_cast<std::make_signed_t<std::size_t>> (std::max (this->digit_count(), other.digit_count())) - 1;
+         i >= 0; --i)
+    {
+      if (digit (i) < other.digit(i))
+        return true;
+      if (digit (i) > other.digit(i))
+        return false;
+    }
+    return false;
+  }
+
+  bool operator>= (const self &other) const
+  {
+    return !(*this < other);
+  }
+  bool operator<= (const self &other) const
+  {
+    return other >= *this;
+  }
+
+  self operator/ (const self &other) const
+  {
+    std::size_t cur_digit = digit_count() - 1;
+    self numerator = 0; 
+    self ret = 0;
+    bool last = false;
+    while (!last)
+      {
+        do {
+            numerator.m_digits.insert(numerator.m_digits.begin (), this->m_digits[cur_digit]);
+            numerator.shrink_to_fit ();
+            if (cur_digit != 0)
+              --cur_digit;
+            else             
+              last = true;
+            if (numerator == 0)
+              ret.m_digits.push_back (0);
+          }
+        while (!last && numerator < other);
+        if (numerator < other)
+          break;
+        int l = 0, r = DigitSize - 1;
+        while (l < r)
+          {
+            DigitType m = l + (r - l + 1) / 2;
+            if (numerator < other * m)
+              r = m - 1;
+            else
+              l = m;
+          }
+        ret.m_digits.push_back (r);
+        numerator = numerator - other * l;
+      }
+    std::reverse (ret.m_digits.begin (), ret.m_digits.end ());
+    assert (numerator == 0); // not divisible exactly
+    return ret;
+  }
+
+  self operator* (const self &other) const
   {
     self ret = 0;
 
@@ -77,7 +143,7 @@ public:
     return *this;
   }
 
-  self operator+ (const self &other)
+  self operator+ (const self &other) const 
   {
     auto total_count = std::max (digit_count(), other.digit_count());
     bool of_the_same_sign = (this->m_sign == other.m_sign);
@@ -100,6 +166,8 @@ public:
                 sum += DigitSize;
                 mem = -1;
               }
+            else
+              mem = 0;
             ret.assign_digit(i, sum);
           }
       }
@@ -115,7 +183,7 @@ public:
     return *this;
   }
 
-  self operator- (self other)
+  self operator- (self other) const
   {
     other.m_sign = negate (other.m_sign);
     return *this + other;

@@ -29,3 +29,19 @@ TEST_CASE("longnum_multiplication")
     REQUIRE (x * y == -200000);
   }
 }
+
+TEST_CASE("longnum_division")
+{
+  {
+    longnum<int, 10> x = 39, y = 3;
+    REQUIRE (x / y == 13);
+  }
+  {
+    longnum<int, 10> x = 309, y = 3;
+    REQUIRE (x / y == 103);
+  }
+    {
+    longnum<int, 10> x = 56052, y = 173;
+    REQUIRE (x / y == 324);
+  }
+}
