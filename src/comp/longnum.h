@@ -48,6 +48,35 @@ public:
     return (m_digits == other.m_digits);
   }
 
+  self operator* (const self &other)
+  {
+    self ret = 0;
+
+    for (size_t i = 0; i < this->digit_count(); ++i)
+      {
+        self summand = 0;
+        size_t mem = 0;
+        for (size_t j = 0; j < other.digit_count() + 1; ++j)
+          {
+            auto sum = digit (i) * other.digit (j) + mem;
+            summand.assign_digit (i + j, sum % DigitSize);
+            mem = sum / DigitSize;
+          }
+        summand.shrink_to_fit();
+        ret += summand;
+      }
+
+    bool of_the_same_sign = (this->m_sign == other.m_sign);
+    ret.m_sign = of_the_same_sign ? sign_t::plus : sign_t::minus;
+    return ret;
+  }
+
+  self &operator*= (const self &other)
+  {
+    *this = *this * other;
+    return *this;
+  }
+
   self operator+ (const self &other)
   {
     auto total_count = std::max (digit_count(), other.digit_count());
@@ -80,10 +109,22 @@ public:
     return ret;
   }
 
+  self &operator+= (const self &other)
+  {
+    *this = *this + other;
+    return *this;
+  }
+
   self operator- (self other)
   {
     other.m_sign = negate (other.m_sign);
     return *this + other;
+  }
+
+  self &operator-= (const self &other)
+  {
+    *this = *this - other;
+    return *this;
   }
 
   DigitType digit (std::size_t i) const { return i < m_digits.size () ? m_digits[i] : 0;}
