@@ -44,4 +44,12 @@ TEST_CASE("longnum_division")
     longnum<int, 10> x = 56052, y = 173;
     REQUIRE (x / y == 324);
   }
+  {
+    longnum<int, 10> x = 1667492481620ll, y = 4;
+    REQUIRE (x / y == 416873120405);
+  }
+  {
+    longnum<int, 10> x = 50, y = 1;
+    REQUIRE (x / y == 50);
+  }
 }

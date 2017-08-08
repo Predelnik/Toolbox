@@ -56,7 +56,7 @@ public:
     if (digit_count () > other.digit_count())
       return false;
 
-    for (auto i = static_cast<std::make_signed_t<std::size_t>> (std::max (this->digit_count(), other.digit_count())) - 1;
+    for (auto i = static_cast<typename std::make_signed<std::size_t>::type> (std::max (this->digit_count(), other.digit_count())) - 1;
          i >= 0; --i)
     {
       if (digit (i) < other.digit(i))
@@ -84,17 +84,21 @@ public:
     bool last = false;
     while (!last)
       {
-        do {
+        while (!last)
+          {
             numerator.m_digits.insert(numerator.m_digits.begin (), this->m_digits[cur_digit]);
             numerator.shrink_to_fit ();
             if (cur_digit != 0)
               --cur_digit;
-            else             
+            else
               last = true;
-            if (numerator == 0)
-              ret.m_digits.push_back (0);
-          }
-        while (!last && numerator < other);
+            if (numerator < other)
+              {
+                ret.m_digits.push_back (0);
+                continue;
+              }
+            break;
+          }        
         if (numerator < other)
           break;
         int l = 0, r = DigitSize - 1;
@@ -110,25 +114,35 @@ public:
         numerator = numerator - other * l;
       }
     std::reverse (ret.m_digits.begin (), ret.m_digits.end ());
+    ret.shrink_to_fit ();
     assert (numerator == 0); // not divisible exactly
+    return ret;
+  }
+
+  self operator* (const DigitType &other) const
+  {
+     self ret = 0;
+     size_t mem = 0;
+     ret.m_digits.reserve (digit_count () + 1);
+     for (size_t i = 0; i < this->digit_count() + 1; ++i)
+       {
+         auto sum = other * digit (i) + mem;
+         ret.assign_digit (i, sum % DigitSize);
+         mem = sum / DigitSize;
+       }
+    ret.shrink_to_fit();
     return ret;
   }
 
   self operator* (const self &other) const
   {
     self ret = 0;
+    ret.m_digits.reserve(digit_count() + other.digit_count() + 1);
 
-    for (size_t i = 0; i < this->digit_count(); ++i)
+    for (size_t i = 0; i < other.digit_count(); ++i)
       {
-        self summand = 0;
-        size_t mem = 0;
-        for (size_t j = 0; j < other.digit_count() + 1; ++j)
-          {
-            auto sum = digit (i) * other.digit (j) + mem;
-            summand.assign_digit (i + j, sum % DigitSize);
-            mem = sum / DigitSize;
-          }
-        summand.shrink_to_fit();
+        auto summand = (*this) * other.digit (i);
+        summand.m_digits.insert (summand.m_digits.begin (), i, DigitType (0));
         ret += summand;
       }
 
