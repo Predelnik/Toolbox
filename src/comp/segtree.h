@@ -10,6 +10,16 @@
 // way to stack updates (may be something totally different from add):
 // friend UpdateOperation operator+ (const UpdateOperation &, const UpdateOperation &) -> new_update_value
 // }
+/*
+ Sample:
+
+ struct my_op
+ {
+   bool is_null () const {}
+   int apply (int prev_range_value, ptrdiff_t range_length) {}
+   friend inv_op operator+ (const my_op &lhs, const my_op &rhs) {}
+ };
+ */
 
 // QueryOperation = function (ValueType, ValueType) -> ValueType
 
