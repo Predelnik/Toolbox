@@ -3,8 +3,8 @@
 // helper class which allows for arbitrary type T to have semantics similar to
 // unique_ptr<> i.e. move_only<T> is move only, obviously a = std::move (b),
 // causes b to have value of default constructed T{} useful with bool flags and
-// possibly pointers/handles In case of pointers/handles unique_ptr with custom
-// deleter could be used instead though.
+// possibly pointers/handles In case of pointers unique_ptr with custom
+// deleter could be used instead though but it is often more cumbersome.
 
 #include <utility>
 
@@ -26,10 +26,11 @@ public:
     other.value = T{};
     return *this;
   }
+  move_only () = default;
   ~move_only () = default;
   const T &get() const { return value; }
   T &get() { return value; }
 
 private:
-  T value;
+  T value = {};
 };
