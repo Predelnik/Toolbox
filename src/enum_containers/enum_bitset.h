@@ -27,7 +27,7 @@ namespace ebc
 		self &operator= (enum_bitset &&) = default;
 		~enum_bitset() = default;
 
-		reference operator[](EnumT index) {
+		auto operator[](EnumT index) {
 			return parent_t::operator[](static_cast<size_t>(index));
 		}
 

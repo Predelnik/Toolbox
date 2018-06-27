@@ -4,13 +4,6 @@
 #include <cassert>
 #include <array>
 #include <iterator>
-
-#ifndef _MSC_VER
-#define TYPENAME_IF_NOT_MSVC typename // due to bug in msvc with parsing variadic template templates
-#else
-#define TYPENAME_IF_NOT_MSVC
-#endif // _MSC_VER
-
 namespace btree
 {
   enum class color_t : char
@@ -114,7 +107,7 @@ namespace btree
     using node_storage_t = std::unique_ptr<base_node_t, void (*)(base_node_t *)>;
     static void delete_node(base_node_t *node) { delete static_cast<NodeType *> (node); }
     template <typename ArgType>
-    static node_storage_t make_node (ArgType &&key) { return node_storage_t (new NodeType (std::forward<ArgType> (key)), &delete_node); } 
+    static node_storage_t make_node (ArgType &&key) { return node_storage_t (new NodeType (std::forward<ArgType> (key)), &delete_node); }
 
   public:
     class base_node_t
@@ -232,7 +225,7 @@ namespace btree
       {
         if (this->is_sentinel)
           return {nullptr, &delete_node};
-        std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<NodeType>::node_t*>(this)->before_takeout() , 0)...};
+        std::initializer_list<int>{(static_cast<typename Plugins<NodeType>::node_t*>(this)->before_takeout() , 0)...};
         auto parent = this->m_parent;
         auto direction = direction_from_parent();
         this->m_parent = nullptr;
@@ -247,7 +240,7 @@ namespace btree
         if (!m_children[dir]->is_sentinel)
         {
           static_cast<NodeType *>(m_children[dir].get())->m_parent = static_cast<NodeType *>(this);
-          std::initializer_list<int>{(static_cast<TYPENAME_IF_NOT_MSVC Plugins<NodeType>::node_t*>(this->child(dir))->on_new_child() , 0)...};
+          std::initializer_list<int>{(static_cast<typename Plugins<NodeType>::node_t*>(this->child(dir))->on_new_child() , 0)...};
         }
 
         return this->child(dir);
@@ -340,7 +333,7 @@ namespace btree
 
       tree_t () : m_sentinel (this), m_size (0), m_root (nullptr, &delete_node)
       {
-        
+
       }
 
       iterator_t begin()
@@ -640,14 +633,14 @@ namespace btree
 
         if (m->color() == color_t::red)
           {
-            replace_with_child(m);
+            this->replace_with_child(m);
             return 1;
           }
         auto c = m->single_child();
         auto p = m->parent();
         auto s = m->sibling();
         auto n_direction = m->direction_from_parent();
-        replace_with_child(m);
+        this->replace_with_child(m);
         if (c && c->color() == color_t::red)
         {
           c->paint(color_t::black);

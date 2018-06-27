@@ -23,19 +23,19 @@ namespace ebc
 		using parent_t::const_iterator;
 		using parent_t::const_reverse_iterator;
 
-		reference at(EnumT index) {
+		auto &at(EnumT index) {
 			return parent_t::at(static_cast<size_t>(index));
 		}
 
-		const_reference at(EnumT index) const {
+		auto &at(EnumT index) const {
 			return parent_t::at(static_cast<size_t>(index));
 		}
 
-		reference operator[](EnumT index) {
+		auto &operator[](EnumT index) {
 			return parent_t::operator[](static_cast<size_t>(index));
 		}
 
-		const_reference operator[](EnumT index) const {
+		auto &operator[](EnumT index) const {
 			return parent_t::operator[](static_cast<size_t>(index));
 		}
 

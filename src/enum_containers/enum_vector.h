@@ -23,19 +23,19 @@ public:
 	enum_vector() : parent_t(static_cast<size_t> (EnumT::COUNT)) {
 	}
 
-	reference at(EnumT index) {
+	typename parent_t::reference at(EnumT index) {
 		return parent_t::at(static_cast<size_t>(index));
 	}
 
-	const_reference at(EnumT index) const {
+	typename parent_t::const_reference at(EnumT index) const {
 		return parent_t::at(static_cast<size_t>(index));
 	}
 
-	reference operator[](EnumT index) {
+	typename parent_t::reference operator[](EnumT index) {
 		return parent_t::operator[](static_cast<size_t>(index));
 	}
 
-	const_reference operator[](EnumT index) const {
+	typename parent_t::const_reference operator[](EnumT index) const {
 		return parent_t::operator[](static_cast<size_t>(index));
 	}
 
